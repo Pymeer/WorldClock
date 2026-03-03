@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Clocks</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    color: #fff;
+    font-family: 'Helvetica Neue', sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    padding: 2rem;
+    border-bottom: 1px solid #1e1e2e;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  header h1 { font-size: 1.1rem; font-weight: 300; letter-spacing: 0.2em; color: #888; text-transform: uppercase; }
+  .dot { width: 8px; height: 8px; background: #6c63ff; border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  .search-bar {
+    padding: 1.5rem 2rem;
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .search-wrap { position: relative; flex: 1; min-width: 220px; }
+  .search-wrap input {
+    width: 100%;
+    background: #13131f;
+    border: 1px solid #2a2a3e;
+    color: #fff;
+    padding: 0.7rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border .2s;
+  }
+  .search-wrap input:focus { border-color: #6c63ff; }
+  .dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    background: #13131f;
+    border: 1px solid #2a2a3e;
+    border-radius: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+  }
+  .dropdown.open { display: block; }
+  .dropdown-item {
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #ccc;
+    transition: background .15s;
+  }
+  .dropdown-item:hover { background: #1e1e30; color: #fff; }
+  .dropdown-item span { color: #6c63ff; font-size: 0.75rem; margin-left: 0.5rem; }
+
+  .clocks {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
+    padding: 1rem 2rem 2rem;
+  }
+  .clock-card {
+    background: #13131f;
+    border: 1px solid #1e1e2e;
+    border-radius: 12px;
+    padding: 1.5rem;
+    position: relative;
+    transition: border-color .2s;
+  }
+  .clock-card:hover { border-color: #6c63ff44; }
+  .clock-card .remove {
+    position: absolute;
+    top: 10px; right: 12px;
+    background: none; border: none;
+    color: #444; cursor: pointer;
+    font-size: 1rem; line-height: 1;
+    transition: color .2s;
+  }
+  .clock-card .remove:hover { color: #ff6b6b; }
+  .clock-city { font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; color: #666; margin-bottom: 0.3rem; }
+  .clock-country { font-size: 0.75rem; color: #444; margin-bottom: 1rem; }
+  .clock-face {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+  }
+  svg.analog { width: 80px; height: 80px; }
+  .clock-digital {
+    font-size: 1.6rem;
+    font-weight: 200;
+    letter-spacing: 0.05em;
+    color: #fff;
+    text-align: center;
+  }
+  .clock-date { font-size: 0.7rem; color: #555; text-align: center; margin-top: 0.25rem; }
+  .clock-offset { font-size: 0.65rem; color: #444; text-align: center; margin-top: 0.15rem; }
+
+  .empty {
+    grid-column: 1/-1;
+    text-align: center;
+    color: #333;
+    padding: 4rem;
+    font-size: 0.9rem;
+    letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="dot"></div>
+  <h1>World Clocks</h1>
+</header>
+
+<div class="search-bar">
+  <div class="search-wrap">
+    <input type="text" id="citySearch" placeholder="Add a city…" autocomplete="off">
+    <div class="dropdown" id="dropdown"></div>
+  </div>
+</div>
+
+<div class="clocks" id="clocksGrid">
+  <div class="empty" id="emptyMsg">Search for a city to add a clock</div>
+</div>
+
+<script>
+const CITIES = [
+  {city:"Paris",country:"France",tz:"Europe/Paris"},
+  {city:"London",country:"UK",tz:"Europe/London"},
+  {city:"New York",country:"USA",tz:"America/New_York"},
+  {city:"Los Angeles",country:"USA",tz:"America/Los_Angeles"},
+  {city:"Chicago",country:"USA",tz:"America/Chicago"},
+  {city:"São Paulo",country:"Brazil",tz:"America/Sao_Paulo"},
+  {city:"Buenos Aires",country:"Argentina",tz:"America/Argentina/Buenos_Aires"},
+  {city:"Mexico City",country:"Mexico",tz:"America/Mexico_City"},
+  {city:"Toronto",country:"Canada",tz:"America/Toronto"},
+  {city:"Dubai",country:"UAE",tz:"Asia/Dubai"},
+  {city:"Riyadh",country:"Saudi Arabia",tz:"Asia/Riyadh"},
+  {city:"Mumbai",country:"India",tz:"Asia/Kolkata"},
+  {city:"Delhi",country:"India",tz:"Asia/Kolkata"},
+  {city:"Singapore",country:"Singapore",tz:"Asia/Singapore"},
+  {city:"Hong Kong",country:"China",tz:"Asia/Hong_Kong"},
+  {city:"Shanghai",country:"China",tz:"Asia/Shanghai"},
+  {city:"Beijing",country:"China",tz:"Asia/Shanghai"},
+  {city:"Tokyo",country:"Japan",tz:"Asia/Tokyo"},
+  {city:"Seoul",country:"South Korea",tz:"Asia/Seoul"},
+  {city:"Sydney",country:"Australia",tz:"Australia/Sydney"},
+  {city:"Melbourne",country:"Australia",tz:"Australia/Melbourne"},
+  {city:"Auckland",country:"New Zealand",tz:"Pacific/Auckland"},
+  {city:"Berlin",country:"Germany",tz:"Europe/Berlin"},
+  {city:"Amsterdam",country:"Netherlands",tz:"Europe/Amsterdam"},
+  {city:"Brussels",country:"Belgium",tz:"Europe/Brussels"},
+  {city:"Madrid",country:"Spain",tz:"Europe/Madrid"},
+  {city:"Rome",country:"Italy",tz:"Europe/Rome"},
+  {city:"Zurich",country:"Switzerland",tz:"Europe/Zurich"},
+  {city:"Stockholm",country:"Sweden",tz:"Europe/Stockholm"},
+  {city:"Oslo",country:"Norway",tz:"Europe/Oslo"},
+  {city:"Helsinki",country:"Finland",tz:"Europe/Helsinki"},
+  {city:"Warsaw",country:"Poland",tz:"Europe/Warsaw"},
+  {city:"Vienna",country:"Austria",tz:"Europe/Vienna"},
+  {city:"Prague",country:"Czech Republic",tz:"Europe/Prague"},
+  {city:"Moscow",country:"Russia",tz:"Europe/Moscow"},
+  {city:"Istanbul",country:"Turkey",tz:"Europe/Istanbul"},
+  {city:"Cairo",country:"Egypt",tz:"Africa/Cairo"},
+  {city:"Lagos",country:"Nigeria",tz:"Africa/Lagos"},
+  {city:"Nairobi",country:"Kenya",tz:"Africa/Nairobi"},
+  {city:"Johannesburg",country:"South Africa",tz:"Africa/Johannesburg"},
+  {city:"Casablanca",country:"Morocco",tz:"Africa/Casablanca"},
+  {city:"Karachi",country:"Pakistan",tz:"Asia/Karachi"},
+  {city:"Dhaka",country:"Bangladesh",tz:"Asia/Dhaka"},
+  {city:"Bangkok",country:"Thailand",tz:"Asia/Bangkok"},
+  {city:"Jakarta",country:"Indonesia",tz:"Asia/Jakarta"},
+  {city:"Kuala Lumpur",country:"Malaysia",tz:"Asia/Kuala_Lumpur"},
+  {city:"Taipei",country:"Taiwan",tz:"Asia/Taipei"},
+  {city:"San Francisco",country:"USA",tz:"America/Los_Angeles"},
+  {city:"Seattle",country:"USA",tz:"America/Los_Angeles"},
+  {city:"Denver",country:"USA",tz:"America/Denver"},
+  {city:"Miami",country:"USA",tz:"America/New_York"},
+  {city:"Boston",country:"USA",tz:"America/New_York"},
+  {city:"Vancouver",country:"Canada",tz:"America/Vancouver"},
+  {city:"Montreal",country:"Canada",tz:"America/Toronto"},
+  {city:"Lisbon",country:"Portugal",tz:"Europe/Lisbon"},
+  {city:"Athens",country:"Greece",tz:"Europe/Athens"},
+  {city:"Budapest",country:"Hungary",tz:"Europe/Budapest"},
+  {city:"Bucharest",country:"Romania",tz:"Europe/Bucharest"},
+  {city:"Kiev",country:"Ukraine",tz:"Europe/Kiev"},
+  {city:"Riyadh",country:"Saudi Arabia",tz:"Asia/Riyadh"},
+  {city:"Doha",country:"Qatar",tz:"Asia/Qatar"},
+  {city:"Colombo",country:"Sri Lanka",tz:"Asia/Colombo"},
+  {city:"Kathmandu",country:"Nepal",tz:"Asia/Kathmandu"},
+  {city:"Tashkent",country:"Uzbekistan",tz:"Asia/Tashkent"},
+  {city:"Almaty",country:"Kazakhstan",tz:"Asia/Almaty"},
+  {city:"Vladivostok",country:"Russia",tz:"Asia/Vladivostok"},
+  {city:"Honolulu",country:"USA",tz:"Pacific/Honolulu"},
+  {city:"Anchorage",country:"USA",tz:"America/Anchorage"},
+];
+
+let active = [];
+
+// Default cities
+["Paris","New York","Tokyo","Dubai"].forEach(name => {
+  const c = CITIES.find(x=>x.city===name);
+  if(c) active.push(c);
+});
+
+const searchInput = document.getElementById('citySearch');
+const dropdown = document.getElementById('dropdown');
+const grid = document.getElementById('clocksGrid');
+const emptyMsg = document.getElementById('emptyMsg');
+
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.toLowerCase().trim();
+  if(!q){ dropdown.classList.remove('open'); return; }
+  const results = CITIES.filter(c =>
+    c.city.toLowerCase().includes(q) && !active.find(a=>a.city===c.city)
+  ).slice(0,8);
+  dropdown.innerHTML = results.map(c =>
+    `<div class="dropdown-item" data-city="${c.city}">
+      ${c.city} <span>${c.country}</span>
+    </div>`
+  ).join('') || '<div class="dropdown-item" style="color:#444">No results</div>';
+  dropdown.classList.add('open');
+});
+
+dropdown.addEventListener('click', e => {
+  const item = e.target.closest('.dropdown-item');
+  if(!item || !item.dataset.city) return;
+  const city = CITIES.find(c=>c.city===item.dataset.city);
+  if(city){ active.push(city); render(); }
+  searchInput.value = '';
+  dropdown.classList.remove('open');
+});
+
+document.addEventListener('click', e => {
+  if(!e.target.closest('.search-wrap')) dropdown.classList.remove('open');
+});
+
+function getTimeIn(tz){
+  return new Date(new Date().toLocaleString('en-US',{timeZone:tz}));
+}
+
+function getOffset(tz){
+  const now = new Date();
+  const local = new Date(now.toLocaleString('en-US',{timeZone:tz}));
+  const diff = (local - now + (now.getTimezoneOffset()*60000)) / 3600000;
+  const sign = diff >= 0 ? '+' : '';
+  const h = Math.floor(Math.abs(diff));
+  const m = Math.round((Math.abs(diff)-h)*60);
+  return `UTC${sign}${diff<0?'-':''}${String(h).padStart(2,'0')}${m?':'+String(m).padStart(2,'0'):''}`;
+}
+
+function analogSVG(h, m, s) {
+  const r = 38, cx = 40, cy = 40;
+  const toRad = deg => (deg-90)*Math.PI/180;
+  const pt = (angle, len) => ({
+    x: cx + len*Math.cos(toRad(angle)),
+    y: cy + len*Math.sin(toRad(angle))
+  });
+  const hAngle = (h%12)*30 + m*0.5;
+  const mAngle = m*6 + s*0.1;
+  const sAngle = s*6;
+  const hPt = pt(hAngle, 22);
+  const mPt = pt(mAngle, 30);
+  const sPt = pt(sAngle, 33);
+  // tick marks
+  let ticks = '';
+  for(let i=0;i<12;i++){
+    const a = i*30;
+    const inner = pt(a, 32);
+    const outer = pt(a, 38);
+    ticks += `<line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}" stroke="${i%3===0?'#555':'#333'}" stroke-width="${i%3===0?1.5:0.8}"/>`;
+  }
+  return `<svg class="analog" viewBox="0 0 80 80">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#1e1e2e" stroke-width="1.5"/>
+    ${ticks}
+    <line x1="${cx}" y1="${cy}" x2="${hPt.x}" y2="${hPt.y}" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="${cx}" y1="${cy}" x2="${mPt.x}" y2="${mPt.y}" stroke="#aaa" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="${cx}" y1="${cy}" x2="${sPt.x}" y2="${sPt.y}" stroke="#6c63ff" stroke-width="1" stroke-linecap="round"/>
+    <circle cx="${cx}" cy="${cy}" r="2.5" fill="#6c63ff"/>
+  </svg>`;
+}
+
+function render() {
+  emptyMsg.style.display = active.length ? 'none' : 'block';
+  // Remove old cards
+  grid.querySelectorAll('.clock-card').forEach(el => el.remove());
+  active.forEach((c, i) => {
+    const card = document.createElement('div');
+    card.className = 'clock-card';
+    card.dataset.idx = i;
+    grid.appendChild(card);
+  });
+  updateTimes();
+}
+
+function updateTimes() {
+  document.querySelectorAll('.clock-card').forEach(card => {
+    const i = parseInt(card.dataset.idx);
+    const c = active[i];
+    if(!c) return;
+    const t = getTimeIn(c.tz);
+    const h = t.getHours(), m = t.getMinutes(), s = t.getSeconds();
+    const hh = String(h).padStart(2,'0');
+    const mm = String(m).padStart(2,'0');
+    const ss = String(s).padStart(2,'0');
+    const dateStr = t.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+    card.innerHTML = `
+      <button class="remove" data-idx="${i}">✕</button>
+      <div class="clock-city">${c.city}</div>
+      <div class="clock-country">${c.country}</div>
+      <div class="clock-face">${analogSVG(h,m,s)}</div>
+      <div class="clock-digital">${hh}:${mm}:<span style="color:#555">${ss}</span></div>
+      <div class="clock-date">${dateStr}</div>
+      <div class="clock-offset">${getOffset(c.tz)}</div>
+    `;
+  });
+
+  document.querySelectorAll('.remove').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.idx);
+      active.splice(idx, 1);
+      render();
+    });
+  });
+}
+
+render();
+setInterval(updateTimes, 1000);
+</script>
+</body>
+</html>
